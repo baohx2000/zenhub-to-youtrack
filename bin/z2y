@@ -1,0 +1,14 @@
+#!/usr/bin/env php
+<?php
+require_once dirname(__DIR__).'/vendor/autoload.php';
+
+$injector = new \Auryn\Injector();
+// configure DI
+(new \B2k\ZH2YT\Application\DIConfig())($injector);
+
+$app = new \Symfony\Component\Console\Application('ZH To YT Migrator');
+$loader = new \B2k\ZH2YT\Application\CommandLoader($injector, $app);
+
+$loader->loadCommands(dirname(__DIR__).'/src/Command', 'B2k\\ZH2YT\\Command');
+
+$app->run();

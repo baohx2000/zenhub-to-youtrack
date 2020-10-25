@@ -1,0 +1,27 @@
+{
+    "name": "baohx2000/zenhub-to-youtrack",
+    "description": "CLI to migrate issues / epics from zenhub to youtrack",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Gordon Forsythe",
+            "email": "baohx2000@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "B2k\\ZH2YT\\": "src/"
+        }
+    },
+    "require": {
+        "cybercog/youtrack-rest-php": "^6.2",
+        "symfony/console": "^5.1",
+        "rdlowrey/auryn": "^1.4",
+        "symfony/finder": "^5.1",
+        "symfony/dotenv": "^5.1",
+        "php-http/guzzle6-adapter": "^2.0",
+        "knplabs/github-api": "^2.15"
+    },
+    "require-dev": {"roave/security-advisories": "dev-master"}
+}
