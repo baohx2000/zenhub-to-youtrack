@@ -38,6 +38,7 @@ class MigrateEpicsCommand extends Command
             ->addArgument('repo-id', InputArgument::REQUIRED, 'GitHub REPO ID (numeric)')
             ->addOption('no-skip-closed', null, InputOption::VALUE_NONE, 'By default, we will not migrate closed epics')
             ->addOption('no-dry-run', null, InputOption::VALUE_NONE, 'Include this option when you wish to actually run the migration')
+            ->addOption('skip', null, InputOption::VALUE_REQUIRED, 'Skip this number of epics initially')
         ;
     }
 
@@ -55,31 +56,73 @@ class MigrateEpicsCommand extends Command
         $dryRun = !$input->getOption('no-dry-run');
 
         $epics = $this->zenHubClient->listEpics((int) $repoId);
+        $skip = (int) $input->getOption('skip');
 
-        foreach ($epics as $epic) {
-            $issueId = $epic->issue_number;
+        foreach ($epics as $key => $epic) {
+            if ($key < $skip) {
+                continue;
+            }
+            $epicId = $epic->issue_number;
 
             preg_match('/([^\/]+)\/([^\/]+)\/issues\/(\d+)$/', $epic->issue_url, $matches);
             [, $org, $repo] = $matches;
-            $ghEpic = $this->gitHubClient->getIssue($org, $repo, $issueId);
-            ['title' => $title, 'body' => $body, 'labels' => $labels] = $ghEpic;
+            $ghEpic = $this->gitHubClient->getIssue($org, $repo, $epicId);
+            ['title' => $title, 'body' => $body /*, 'labels' => $labels */] = $ghEpic;
 
             if ($skipClosed && $ghEpic['state'] === 'closed') {
                 if ($output->isVerbose()) {
-                    $output->writeln("Skipping closed epic: {$title} ({$issueId})");
+                    $output->writeln("Skipping closed epic: {$title} ({$epicId})");
                 }
                 continue;
             }
-            $zhEpic = $this->zenHubClient->getEpic($repoId, $issueId);
 
             $q = new ConfirmationQuestion(
-                "Migrate issue {$issueId} {$title}?",
+                "Migrate epic {$epicId} {$title}?",
                 false
             );
 
-            if ($asker->ask($input, $output, $q)) {
-                var_dump($ghEpic);
-                //if ()
+            if ($output->isQuiet() || $asker->ask($input, $output, $q)) {
+                $zhEpic = $this->zenHubClient->getEpic($repoId, $epicId);
+                //var_dump($zhEpic);
+                if (!$dryRun) {
+                    $ytEpicId = $this->youTrackClient->makeEpic(
+                        $project,
+                        $title,
+                        $body,
+                        $epicId
+                    );
+                    if ($output->isVerbose()) {
+                        $output->writeln("<info>Created Epic {$ytEpicId}</info>");
+                    }
+                }
+
+                foreach ($zhEpic['issues'] as $task) {
+                    $type = $task['is_epic'] ? 'User Story' : 'Task';
+                    $ghIssue = $this->gitHubClient->getIssue($org, $repo, $task['issue_number']);
+                    if ($ghIssue['state'] === 'closed') {
+                        // only migrating open issues
+                        continue;
+                    }
+
+                    if (!$dryRun) {
+                        $labels = array_map(function ($l) {
+                            return $l['name'];
+                        }, $ghIssue['labels']);
+                        $ytIssueId = $this->youTrackClient->makeItem(
+                            $project,
+                            $type,
+                            $ghIssue['title'],
+                            $ghIssue['body'],
+                            $ytEpicId,
+                            $labels,
+                            $ghIssue['number']
+                        );
+                        if ($output->isVerbose()) {
+                            $output->writeln("<info>Created {$type} {$ytIssueId}</info>");
+                        }
+                        exit;
+                    }
+                }
             }
             exit;
         }
