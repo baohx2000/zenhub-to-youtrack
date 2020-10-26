@@ -26,3 +26,8 @@ A few other helper commands are included in the CLI:
 * `yt:issue:github` Find youtrack issue(s) already linked to a github issue
 * `yt:project:list` Get youtrack projects
 * `zh:epic:list` List epics in ZenHub
+
+To migrate issues, use the commands:
+
+* `migrate:epics` migrates epics and their subtasks
+* `migrate:by-tag` migrates issues with a specific tag
