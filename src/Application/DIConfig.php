@@ -11,6 +11,10 @@ use Cog\YouTrack\Rest\Authorizer\TokenAuthorizer;
 use Cog\YouTrack\Rest\Client\YouTrackClient;
 use Cog\YouTrack\Rest\HttpClient;
 use GuzzleHttp\Client;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\Dotenv\Dotenv;
 
 class DIConfig
@@ -55,7 +59,29 @@ class DIConfig
             ->delegate(
                 YouTrackClient::class,
                 function () use ($injector, $ytToken, $ytDomain): YouTrackClient {
-                    $guzzle = new Client(['base_uri' => "https://{$ytDomain}/youtrack/"]);
+                    $handlerStack = HandlerStack::create();
+                    $handlerStack->push(Middleware::retry(
+                        function ($retries, RequestInterface $request, ResponseInterface $response) {
+                            if ($retries > 10)  {
+                                var_dump($request);
+                                $request->getBody()->rewind();
+                                var_dump($request->getBody()->getContents());
+
+                                return false;
+                            }
+                            return $response->getStatusCode() === 403;
+                        },
+                        function ($retries) {
+                            return $retries * 1000;
+                        }
+                    ));
+
+                    $guzzle = new Client(
+                        [
+                            'handler' => $handlerStack,
+                            'base_uri' => "https://{$ytDomain}/youtrack/"
+                        ]
+                    );
                     $client = new HttpClient\GuzzleHttpClient($guzzle);
                     $auth = new TokenAuthorizer($ytToken);
 

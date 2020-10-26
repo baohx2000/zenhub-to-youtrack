@@ -44,7 +44,7 @@ class YouTrackClient
             'issue',
             [],
             [
-                'query' => [
+                'form_params' => [
                     'project' => $project,
                     'summary' => $title,
                     'description' => $body,
@@ -82,7 +82,7 @@ class YouTrackClient
             'issue',
             [],
             [
-                'query' => [
+                'form_params' => [
                     'project' => $project,
                     'summary' => $title,
                     'description' => $body,

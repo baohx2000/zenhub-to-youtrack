@@ -39,6 +39,7 @@ class MigrateEpicsCommand extends Command
             ->addOption('no-skip-closed', null, InputOption::VALUE_NONE, 'By default, we will not migrate closed epics')
             ->addOption('no-dry-run', null, InputOption::VALUE_NONE, 'Include this option when you wish to actually run the migration')
             ->addOption('skip', null, InputOption::VALUE_REQUIRED, 'Skip this number of epics initially')
+            ->addOption('yes', 'y', InputOption::VALUE_NONE, 'Do not ask to import')
         ;
     }
 
@@ -48,6 +49,7 @@ class MigrateEpicsCommand extends Command
             'project' => $project,
             'repo-id' => $repoId,
         ] = $input->getArguments();
+        $yes = $input->getOption('yes');
 
         /** @var QuestionHelper $asker */
         $asker = $this->getHelper('question');
@@ -76,23 +78,35 @@ class MigrateEpicsCommand extends Command
                 continue;
             }
 
+            // check if epic exists
+            $result = $this->youTrackClient->findIssueByGithubId($project, $epicId);
+            if ($result) {
+                $output->writeln("<warning>Epic {$epicId} already exists in youtrack</warning>");
+                continue;
+            }
             $q = new ConfirmationQuestion(
                 "Migrate epic {$epicId} {$title}?",
                 false
             );
 
-            if ($output->isQuiet() || $asker->ask($input, $output, $q)) {
+            if ($yes || $output->isQuiet() || $asker->ask($input, $output, $q)) {
                 $zhEpic = $this->zenHubClient->getEpic($repoId, $epicId);
                 //var_dump($zhEpic);
                 if (!$dryRun) {
-                    $ytEpicId = $this->youTrackClient->makeEpic(
-                        $project,
-                        $title,
-                        $body,
-                        $epicId
-                    );
-                    if ($output->isVerbose()) {
-                        $output->writeln("<info>Created Epic {$ytEpicId}</info>");
+                    try {
+                        $ytEpicId = $this->youTrackClient->makeEpic(
+                            $project,
+                            $title,
+                            "Migrated from https://github.com/pagely/mgmt/issues/{$epicId}\n\n".
+                            $body,
+                            $epicId
+                        );
+                        if ($output->isVerbose()) {
+                            $output->writeln("<info>Created Epic {$ytEpicId}</info>");
+                        }
+                    } catch (\Throwable $e) {
+                        $output->writeln("<error>Could not create Epic {$epicId}</error>");
+                        continue;
                     }
                 }
 
@@ -105,26 +119,39 @@ class MigrateEpicsCommand extends Command
                     }
 
                     if (!$dryRun) {
+                        $result = $this->youTrackClient->findIssueByGithubId($project, $ghIssue['number']);
+                        if ($result) {
+                            $output->writeln("<warning>Epic {$epicId} already exists in youtrack</warning>");
+                            continue;
+                        }
+
                         $labels = array_map(function ($l) {
                             return $l['name'];
                         }, $ghIssue['labels']);
-                        $ytIssueId = $this->youTrackClient->makeItem(
-                            $project,
-                            $type,
-                            $ghIssue['title'],
-                            $ghIssue['body'],
-                            $ytEpicId,
-                            $labels,
-                            $ghIssue['number']
-                        );
-                        if ($output->isVerbose()) {
-                            $output->writeln("<info>Created {$type} {$ytIssueId}</info>");
+                        if (in_array("Feature Request ✨", $labels, true)) {
+                            $type = 'Feature';
                         }
-                        exit;
+
+                        try {
+                            $ytIssueId = $this->youTrackClient->makeItem(
+                                $project,
+                                $type,
+                                $ghIssue['title'],
+                                "Migrated from https://github.com/pagely/mgmt/issues/{$ghIssue['number']}\n".
+                                $ghIssue['body'],
+                                $ytEpicId,
+                                $labels,
+                                $ghIssue['number']
+                            );
+                            if ($output->isVerbose()) {
+                                $output->writeln("  <info>Created {$type} {$ytIssueId}</info>");
+                            }
+                        } catch (\Throwable $e) {
+                            $output->writeln("<error>Unable to migrate GitHub issue {$ghIssue['number']}</error>");
+                        }
                     }
                 }
             }
-            exit;
         }
 
         return 0;
