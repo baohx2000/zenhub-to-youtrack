@@ -21,8 +21,12 @@ class MigrateEpicsCommand extends Command
     protected YouTrackClient $youTrackClient;
     protected GitHubClient $gitHubClient;
 
-    public function __construct(GitHubClient $gitHubClient, ZenHubClient $zenHubClient, YouTrackClient $youTrackClient, string $name = 'migrate')
-    {
+    public function __construct(
+        GitHubClient $gitHubClient,
+        ZenHubClient $zenHubClient,
+        YouTrackClient $youTrackClient,
+        string $name = 'migrate:epics'
+    ) {
         parent::__construct($name);
         $this->zenHubClient = $zenHubClient;
         $this->youTrackClient = $youTrackClient;

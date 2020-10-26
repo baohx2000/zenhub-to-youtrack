@@ -74,7 +74,7 @@ class YouTrackClient
         string $type,
         string $title,
         string $body,
-        string $parentEpic,
+        ?string $parentEpic,
         array $labels,
         int $ghId
     ) {
@@ -94,13 +94,18 @@ class YouTrackClient
         $url = explode('/', $response->location());
         $id = end($url);
 
-        $command = "add subtask of {$parentEpic} Github Issue {$ghId}";
+        $command = "";
+        if ($parentEpic) {
+            $command .= "add subtask of {$parentEpic}";
+        }
+
+        $command .= " Github Issue {$ghId}";
         foreach ($labels as $label) {
             $command .= " tag {$label}";
         }
         $this->client->post("issue/{$id}/execute", [], [
             'form_params' => [
-                'command' => $command,
+                'command' => trim($command),
                 'disableNotifications' => 'true',
             ],
         ]);
