@@ -3,6 +3,9 @@ CLI to migrate issues from zenhub to youtrack
 
 ## SETUP
 
+* Clone this repo
+* CD to repo directory
+* `composer install`
 * Copy sample.env to .env or to ~/.zh2yt.env
 * Edit values in new env file. Should be relatively self-explanatory.
 
